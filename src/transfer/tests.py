@@ -2,9 +2,22 @@ from django.test import TestCase
 
 from account.models import Account
 from customer.models import Customer
-from transfer.models import Transfer
+from transfer.models import Transfer, ScheduledPayment
 from transfer.utils import add_month
-from datetime import date
+from datetime import date, datetime
+import datetime as datetime_module
+from decimal import Decimal
+
+
+class TestDate(datetime):
+    value = datetime(year=2020, month=8, day=5)
+
+    @classmethod
+    def now(cls, *args, **kwargs):
+        return cls.value
+
+
+datetime_module.datetime = TestDate
 
 
 class TransferTest(TestCase):
@@ -39,3 +52,30 @@ class TransferTest(TestCase):
 
         test_date = date(year=2020, month=1, day=31)
         self.assertEqual(add_month(test_date), date(year=2020, month=2, day=29))
+
+    def test_basic_payment_scheduling(self):
+        TestDate.value = TestDate(year=2020, month=8, day=5)
+        ScheduledPayment.schedule_payment(self.account1, self.account2, Decimal(100), 5)
+        payments = ScheduledPayment.objects.filter(from_account=self.account1, to_account=self.account2).all()
+        payments = tuple(payments)
+        self.assertEqual(len(payments), 1)
+        self.assertEqual(payments[0].next_payment_date, date(year=2020, month=9, day=5))
+        self.assertEqual(Transfer.objects.filter(from_account=self.account1, to_account=self.account2).count(), 0)
+
+    def test_payment_scheduling_without_force_payment(self):
+        TestDate.value = TestDate(year=2020, month=8, day=31)
+        ScheduledPayment.schedule_payment(self.account1, self.account2, Decimal(100), 5, force_payment=False)
+        payments = ScheduledPayment.objects.filter(from_account=self.account1, to_account=self.account2).all()
+        payments = tuple(payments)
+        self.assertEqual(len(payments), 1)
+        self.assertEqual(payments[0].next_payment_date, date(year=2020, month=9, day=5))
+        self.assertEqual(Transfer.objects.filter(from_account=self.account1, to_account=self.account2).count(), 0)
+
+    def test_payment_scheduling_with_force_payment(self):
+        TestDate.value = TestDate(year=2020, month=8, day=6)
+        ScheduledPayment.schedule_payment(self.account1, self.account2, Decimal(100), 5, force_payment=True)
+        payments = ScheduledPayment.objects.filter(from_account=self.account1, to_account=self.account2).all()
+        payments = tuple(payments)
+        self.assertEqual(len(payments), 1)
+        self.assertEqual(payments[0].next_payment_date, date(year=2020, month=9, day=5))
+        self.assertEqual(Transfer.objects.filter(from_account=self.account1, to_account=self.account2).count(), 1)
