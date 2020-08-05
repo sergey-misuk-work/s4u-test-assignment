@@ -3,6 +3,8 @@ from django.test import TestCase
 from account.models import Account
 from customer.models import Customer
 from transfer.models import Transfer
+from transfer.utils import add_month
+from datetime import date
 
 
 class TransferTest(TestCase):
@@ -27,3 +29,13 @@ class TransferTest(TestCase):
             to_account=self.account2,
             amount=100,
         ).exists())
+
+    def test_add_month(self):
+        test_date = date(year=2020, month=8, day=5)
+        self.assertEqual(add_month(test_date), date(year=2020, month=9, day=5))
+
+        test_date = date(year=2020, month=8, day=31)
+        self.assertEqual(add_month(test_date), date(year=2020, month=9, day=30))
+
+        test_date = date(year=2020, month=1, day=31)
+        self.assertEqual(add_month(test_date), date(year=2020, month=2, day=29))
