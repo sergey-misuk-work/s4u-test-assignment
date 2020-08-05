@@ -33,6 +33,6 @@ class Transfer(models.Model):
 
 class ScheduledPayment(models.Model):
     next_payment_date = models.DateField()
-    from_account = models.ForeignKey(Account, models.CASCADE)
-    to_account = models.ForeignKey(Account, models.CASCADE)
+    from_account = models.ForeignKey(Account, models.CASCADE, related_name='sender')
+    to_account = models.ForeignKey(Account, models.CASCADE, related_name='receiver')
     amount = models.DecimalField(max_digits=18, decimal_places=2)
