@@ -29,3 +29,10 @@ class Transfer(models.Model):
             to_account=to_account,
             amount=amount
         )
+
+
+class ScheduledPayment(models.Model):
+    next_payment_date = models.DateField()
+    from_account = models.ForeignKey(Account, models.CASCADE)
+    to_account = models.ForeignKey(Account, models.CASCADE)
+    amount = models.DecimalField(max_digits=18, decimal_places=2)
