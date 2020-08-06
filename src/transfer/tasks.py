@@ -10,5 +10,5 @@ def execute_scheduled_payments() -> None:
     scheduled_payments = ScheduledPayment.objects.filter(next_payment_date=current_date).all()
     for payment in scheduled_payments:
         Transfer.do_transfer(payment.from_account, payment.to_account, payment.amount)
-        payment.next_payment_date = add_month(payment.next_payment_date)
+        payment.next_payment_date = add_month(payment.next_payment_date, payment.original_day)
         payment.save()
