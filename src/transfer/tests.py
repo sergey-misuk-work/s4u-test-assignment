@@ -4,9 +4,11 @@ from account.models import Account
 from customer.models import Customer
 from transfer.models import Transfer, ScheduledPayment
 from transfer.utils import add_month
-from datetime import date, datetime
-import datetime as datetime_module
+from datetime import date
+from django.utils.timezone import datetime
+from django.utils import timezone
 from decimal import Decimal
+from transfer.tasks import execute_scheduled_payments
 
 
 class TestDate(datetime):
@@ -17,7 +19,7 @@ class TestDate(datetime):
         return cls.value
 
 
-datetime_module.datetime = TestDate
+timezone.datetime = TestDate
 
 
 class TransferTest(TestCase):
@@ -79,3 +81,13 @@ class TransferTest(TestCase):
         self.assertEqual(len(payments), 1)
         self.assertEqual(payments[0].next_payment_date, date(year=2020, month=9, day=5))
         self.assertEqual(Transfer.objects.filter(from_account=self.account1, to_account=self.account2).count(), 1)
+
+    def test_execute_scheduled_payment_task(self):
+        TestDate.value = TestDate(year=2020, month=8, day=4)
+        ScheduledPayment.schedule_payment(self.account1, self.account2, Decimal(100), 5)
+        self.assertEqual(Transfer.objects.filter(from_account=self.account1, to_account=self.account2).count(), 0)
+        TestDate.value = TestDate(year=2020, month=8, day=5)
+        execute_scheduled_payments.apply()
+        transfers = Transfer.objects.filter(from_account=self.account1, to_account=self.account2).all()
+        transfers = tuple(transfers)
+        self.assertEqual(len(transfers), 1)

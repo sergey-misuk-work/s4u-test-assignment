@@ -3,7 +3,6 @@ from django.db import models
 from account.models import Account
 from django.utils import timezone
 from transfer.utils import add_month
-from datetime import date
 
 
 class InsufficientBalance(Exception):
@@ -42,9 +41,9 @@ class ScheduledPayment(models.Model):
 
     @staticmethod
     def schedule_payment(from_account: Account, to_account: Account, amount: Decimal, day: int = None, force_payment: bool = False):
-        current_date = timezone.now().date()
+        current_date = timezone.datetime.now().date()
 
-        if day < current_date.day:
+        if day > current_date.day:
             next_payment_date = current_date.replace(day=day)
         else:
             if force_payment:
