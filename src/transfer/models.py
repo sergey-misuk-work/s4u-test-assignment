@@ -1,5 +1,5 @@
 from decimal import Decimal
-from django.db import models
+from django.db import models, transaction
 from account.models import Account
 from django.utils import timezone
 from transfer.utils import add_month
@@ -17,20 +17,28 @@ class Transfer(models.Model):
 
     @staticmethod
     def do_transfer(from_account: Account, to_account: Account, amount: Decimal):
-        if from_account.balance < amount:
-            raise InsufficientBalance()
+        with transaction.atomic():
+            from_account_ = Account.objects.select_for_update().get(pk=from_account.pk)
+            to_account_ = Account.objects.select_for_update().get(pk=to_account.pk)
 
-        from_account.balance -= amount
-        to_account.balance += amount
+            if from_account_.balance < amount:
+                raise InsufficientBalance()
 
-        from_account.save()
-        to_account.save()
+            from_account_.balance -= amount
+            to_account_.balance += amount
 
-        return Transfer.objects.create(
-            from_account=from_account,
-            to_account=to_account,
-            amount=amount
-        )
+            from_account_.save()
+            to_account_.save()
+
+            # preserve modified data if any
+            from_account.refresh_from_db(fields=('balance',))
+            to_account.refresh_from_db(fields=('balance',))
+
+            return Transfer.objects.create(
+                from_account=from_account,
+                to_account=to_account,
+                amount=amount
+            )
 
 
 class ScheduledPayment(models.Model):
