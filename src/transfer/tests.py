@@ -91,3 +91,6 @@ class TransferTest(TestCase):
         transfers = Transfer.objects.filter(from_account=self.account1, to_account=self.account2).all()
         transfers = tuple(transfers)
         self.assertEqual(len(transfers), 1)
+
+    def test_do_transfer_negative_amount(self):
+        self.assertRaises(ValueError, lambda: Transfer.do_transfer(self.account1, self.account2, -1))

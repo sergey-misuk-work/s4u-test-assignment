@@ -17,6 +17,9 @@ class Transfer(models.Model):
 
     @staticmethod
     def do_transfer(from_account: Account, to_account: Account, amount: Decimal):
+        if amount < 0:
+            raise ValueError('Amount takes non-negative values only')
+
         with transaction.atomic():
             from_account_ = Account.objects.select_for_update().get(pk=from_account.pk)
             to_account_ = Account.objects.select_for_update().get(pk=to_account.pk)
