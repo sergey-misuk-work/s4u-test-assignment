@@ -14,6 +14,8 @@ class Transfer(models.Model):
     from_account = models.ForeignKey(Account, models.CASCADE, related_name='transfers_in')
     to_account = models.ForeignKey(Account, models.CASCADE, related_name='transfers_out')
     amount = models.DecimalField(max_digits=18, decimal_places=2)
+    is_external = models.BooleanField(null=False, default=False)
+    is_outbound = models.BooleanField(null=False, default=True)
 
     @staticmethod
     def do_transfer(from_account: Account, to_account: Account, amount: Decimal):
@@ -41,6 +43,42 @@ class Transfer(models.Model):
                 from_account=from_account,
                 to_account=to_account,
                 amount=amount
+            )
+
+    @staticmethod
+    def do_external_transfer(account: Account, amount: Decimal, is_outbound: bool = True, **meta: str):
+        if amount < 0:
+            raise ValueError('Amount takes non-negative values only')
+
+        with transaction.atomic():
+            account_ = Account.objects.select_for_update().get(pk=account.pk)
+
+            if is_outbound:
+                if account_.balance < amount:
+                    raise InsufficientBalance()
+
+                account_.balance -= amount
+            else:
+                account_.balance += amount
+
+            # save metadata
+            for key, value in meta:
+                account_.transfer_meta.create(
+                    key=key,
+                    value=value,
+                )
+
+            account_.save()
+
+            # preserve modified data if any
+            account.refresh_from_db(fields=('balance',))
+
+            return Transfer.objects.create(
+                from_account=account,
+                to_account=account,
+                amount=amount,
+                is_external=True,
+                is_outbound=is_outbound,
             )
 
 
@@ -72,3 +110,12 @@ class ScheduledPayment(models.Model):
             amount=amount,
             original_day=day,
         )
+
+
+class TransferMeta(models.Model):
+    """
+    A model that can be used for external transaction data
+    """
+    transfer = models.ForeignKey(Account, models.CASCADE, related_name='transfer_meta')
+    key = models.CharField(max_length=50)
+    value = models.CharField(max_length=128)
